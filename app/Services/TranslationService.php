@@ -64,27 +64,37 @@ class TranslationService
         DB::beginTransaction();
 
         try {
+            // Validate translation data
             foreach ($translations as $translationData) {
-                // Validate translation data
                 if (empty($translationData['language_code']) || empty($translationData['key']) || empty($translationData['translation'])) {
                     throw new \InvalidArgumentException('Invalid translation data provided');
                 }
+            }
 
-                // Find existing translation
-                $translation = Translation::where('translatable_id', $model->id)
-                    ->where('translatable_type', get_class($model))
-                    ->where('language_code', $translationData['language_code'])
-                    ->where('key', $translationData['key'])
-                    ->first();
+            // Retrieve existing translations
+            $existingTranslations = Translation::where('translatable_id', $model->id)
+                ->where('translatable_type', get_class($model))
+                ->get()
+                ->keyBy(function ($item) {
+                    return $item->language_code . '-' . $item->key; // Unique key for each translation
+                });
 
-                if ($translation) {
+            $insertData = [];
+            $updateData = [];
+
+            foreach ($translations as $translationData) {
+                $uniqueKey = $translationData['language_code'] . '-' . $translationData['key'];
+
+                if (isset($existingTranslations[$uniqueKey])) {
                     // Update existing translation
-                    $translation->translation = $translationData['translation'];
-                    $translation->updated_at = now();
-                    $translation->save();
+                    $updateData[] = [
+                        'id' => $existingTranslations[$uniqueKey]->id,
+                        'translation' => $translationData['translation'],
+                        'updated_at' => now(),
+                    ];
                 } else {
-                    // Create a new translation if it doesn't exist
-                    Translation::create([
+                    // Prepare new translation data for bulk insert
+                    $insertData[] = [
                         'language_code' => $translationData['language_code'],
                         'key' => $translationData['key'],
                         'translation' => $translationData['translation'],
@@ -92,8 +102,20 @@ class TranslationService
                         'translatable_type' => get_class($model),
                         'created_at' => now(),
                         'updated_at' => now(),
-                    ]);
+                    ];
                 }
+            }
+
+            // Bulk update existing translations
+            if (!empty($updateData)) {
+                foreach ($updateData as $data) {
+                    Translation::where('id', $data['id'])->update($data);
+                }
+            }
+
+            // Bulk insert new translations
+            if (!empty($insertData)) {
+                Translation::insert($insertData);
             }
 
             DB::commit();
