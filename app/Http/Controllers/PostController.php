@@ -50,6 +50,7 @@ class PostController extends Controller
 
     public function update(Request $request, $id)
     {
+        $post = Post::findOrFail($id);
         DB::beginTransaction();
 
         try {
@@ -57,31 +58,18 @@ class PostController extends Controller
             $validated = $request->validate([
                 'translations' => 'required|array',
                 'translations.*.language_code' => 'required|string|exists:languages,code',
-                'translations.*.title' => 'required|string|max:255',
-                'translations.*.content' => 'required|string',
+                'translations.*.key' => 'required|string|max:255',
+                'translations.*.translation' => 'required|string',
             ]);
 
-            // Find the post
-            $post = Post::findOrFail($id);
-
-            // Update the translations
-            foreach ($validated['translations'] as $translation) {
-                Translation::updateOrCreate(
-                    ['key' => 'post.title.' . $post->id, 'language_code' => $translation['language_code']],
-                    ['translation' => $translation['title']]
-                );
-
-                Translation::updateOrCreate(
-                    ['key' => 'post.content.' . $post->id, 'language_code' => $translation['language_code']],
-                    ['translation' => $translation['content']]
-                );
-            }
+            // Use TranslationService to update translations
+            $this->translationService->updateTranslations($post, $validated['translations']);
 
             DB::commit();
-            return response()->json(['post' => $post]);
+            return response()->json(['post' => $post->load('translations')], 200);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['error' => 'Failed to update post'], 500);
+            return response()->json(['error' => 'Failed to update post or translations: ' . $e->getMessage()], 500);
         }
     }
     public function destroy($id)
