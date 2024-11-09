@@ -15,36 +15,30 @@ class PostController extends Controller
     public function __construct(protected TranslationService $translationService)
     {
     }
-    public function index(Request $request)
+    public function index()
     {
-        $lang = $request->query('lang', 'en'); // Default to 'en' if not specified
-
-        $posts = Post::with([
-            'translations' => function ($query) use ($lang) {
-                $query->where('language_code', $lang);
-            }
-        ])->get();
-
+        $posts = Post::paginate(10); // Har bir sahifada 10 ta postni ko'rsatadi
         return PostResource::collection($posts);
     }
 
 
-    public function store(StorePostRequest $request)
+    public function store(Request $request)
     {
-        DB::beginTransaction();
+        $posts = [
+            ['title' => 'menin postim', 'content' => 'menin postim'],
+            ['title' => 'menin postim 2', 'content' => 'menin postim 2'],
+        ];
+        Post::insert($posts);
+        // yoki tog'ridan tog'ri 
+        Post::insert([
+            ['title' => 'menin postim', 'content' => 'menin postim'],
+            ['title' => 'menin postim 2', 'content' => 'menin postim 2'],
+        ]);
 
-        try {
-            $post = new Post();
-            $post->save();
-            $this->translationService->createTranslations($post, $request->translations);
-
-            DB::commit();
-            return response()->json(['post' => $post->load('translations')], 201);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['error' => 'Failed to create post or translations'], 500);
-        }
+        return 'Post muvaffaqiyatli yaratildi';
     }
+
+
 
 
 

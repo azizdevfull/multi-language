@@ -7,24 +7,29 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class PostResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray($request)
     {
-        // Get the language from the request
-        $lang = $request->query('lang', 'en');
-
-        // Get translations for the specified language
-        $translations = $this->translations->filter(function ($translation) use ($lang) {
-            return $translation->language_code === $lang;
-        });
-
         return [
             'id' => $this->id,
-            'translations' => TranslationResource::collection($translations), // Use TranslationResource
+            'title' => $this->title,
+            'content' => $this->content,
+        ];
+    }
+    public function with(Request $request)
+    {
+        return [
+            'meta' => [
+                'current_page' => $this->currentPage(),
+                'last_page' => $this->lastPage(),
+                'per_page' => $this->perPage(),
+                'total' => $this->total(),
+            ],
+            'links' => [
+                'first' => $this->url(1),
+                'last' => $this->url($this->lastPage()),
+                'prev' => $this->previousPageUrl(),
+                'next' => $this->nextPageUrl(),
+            ],
         ];
     }
 }

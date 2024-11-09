@@ -10,8 +10,6 @@ class Post extends Model
 {
     use HasFactory;
 
-    public function translations()
-    {
-        return $this->morphMany(Translation::class, 'translatable');
-    }
+    protected $fillable = ['title', 'content'];
 }
+
